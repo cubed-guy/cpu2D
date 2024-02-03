@@ -1,6 +1,6 @@
 # DONE: Draw to cells
-# TODO: Generate Groups
-# TODO: Update Group Values
+# DONE: Generate Groups
+# DONE: Update Group Values
 # TODO: Update Transistor States
 # TODO: Optimise matrix rendering
 # TODO: Rewind
@@ -12,8 +12,8 @@ import cpu
 import pygame
 from pygame.locals import *
 pygame.font.init()
-font  = pygame.font.Font('./Product Sans Regular.ttf', 16)
-sfont = pygame.font.Font('./Product Sans Regular.ttf', 12)
+font  = pygame.font.Font('../Product Sans Regular.ttf', 16)
+sfont = pygame.font.Font('../Product Sans Regular.ttf', 12)
 
 c = type('c', (), {'__matmul__': (lambda s, x: (*x.to_bytes(3, 'big'),)), '__sub__': (lambda s, x: (x&255,)*3)})()
 bg = c-34
@@ -29,7 +29,9 @@ def updateStat(msg = None, update = True):
 	rect = (0, h-20, w, 21)
 	display.fill(c-0, rect)
 
-	tsurf = sfont.render(msg or f'{paint_mode}', True, c--1)
+	mouse_pos = pygame.mouse.get_pos()
+	cell = from_screen_space(mouse_pos, view_rect, size)
+	tsurf = sfont.render(msg or f'{cell} {paint_mode} {selected_group and selected_group.cells}', True, c--1)
 	display.blit(tsurf, (5, h-20))
 
 	if update: pygame.display.update(rect)
@@ -45,7 +47,7 @@ def updateDisplay():
 
 	display.fill(bg)
 
-	surf = circuit.render(size, view_rect)
+	surf = circuit.render(size, view_rect, selected_group)
 	display.blit(surf, (0, 0))
 
 	updateStat(update = False)
@@ -71,8 +73,9 @@ view_rect = pygame.Rect(0, 0, w, h)
 dragging = False
 ticks = 0
 
+selected_group = None
 size = 64
-paint_mode = cpu.Cell.insulator
+paint_mode = cpu.Cell.conductor
 print(paint_mode)
 
 circuit = cpu.Circuit(500, 500)
@@ -87,6 +90,7 @@ while running:
 		if event.type == KEYDOWN:
 			if   event.key == K_ESCAPE: running = False
 			elif event.key == K_F11: toggleFullscreen()
+			elif event.key == K_g: circuit.generate_groups()
 
 		elif event.type == VIDEORESIZE:
 			if not display.get_flags()&FULLSCREEN: resize(event.size)
@@ -98,20 +102,27 @@ while running:
 				if pygame.key.get_mods() & (KMOD_LCTRL|KMOD_RCTRL):
 					size += delta
 				else:
-					print(paint_mode.value, paint_mode)
 					val = paint_mode.value + delta - 1
 					val %= len(cpu.Cell)
 					val += 1
 					paint_mode = cpu.Cell(val)
+					print(paint_mode.value, paint_mode)
 
 			elif event.button == 1:
 				dragging = True
 				if not pygame.key.get_mods() & (KMOD_LSHIFT|KMOD_RSHIFT):
 					x, y = from_screen_space(event.pos, view_rect, size)
 					circuit.mat[y][x] = paint_mode
+			elif event.button == 3:
+				x, y = from_screen_space(event.pos, view_rect, size)
+				if (x, y) in circuit.groups:
+					selected_group = circuit.groups[x, y]
 		elif event.type == MOUSEBUTTONUP:
 			if event.button == 1:
 				dragging = False
+			elif event.button == 3:
+				x, y = from_screen_space(event.pos, view_rect, size)
+				selected_group = None
 		elif event.type == MOUSEMOTION:
 			if dragging:
 				if pygame.key.get_mods() & (KMOD_LSHIFT|KMOD_RSHIFT):
@@ -122,4 +133,3 @@ while running:
 
 	updateDisplay()
 	ticks += clock.tick(fps)
-
