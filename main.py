@@ -1,7 +1,8 @@
 # DONE: Draw to cells
 # DONE: Generate Groups
 # DONE: Update Group Values
-# TODO: Update Transistor States
+# DONE: Update Transistor States
+# TODO: Resistors are not insulators
 # TODO: Optimise matrix rendering
 # TODO: Rewind
 
@@ -31,7 +32,7 @@ def updateStat(msg = None, update = True):
 
 	mouse_pos = pygame.mouse.get_pos()
 	cell = from_screen_space(mouse_pos, view_rect, size)
-	tsurf = sfont.render(msg or f'{cell} {paint_mode} {selected_group and selected_group.cells}', True, c--1)
+	tsurf = sfont.render(msg or f'{cell} {paint_mode}', True, c--1)
 	display.blit(tsurf, (5, h-20))
 
 	if update: pygame.display.update(rect)
@@ -44,7 +45,6 @@ def resize(size):
 	updateDisplay()
 
 def updateDisplay():
-
 	display.fill(bg)
 
 	surf = circuit.render(size, view_rect, selected_group)
@@ -75,10 +75,30 @@ ticks = 0
 
 selected_group = None
 size = 64
-paint_mode = cpu.Cell.conductor
+paint_mode = cpu.Cell.ground
 print(paint_mode)
 
 circuit = cpu.Circuit(500, 500)
+
+circuit.mat[6][4] = cpu.Cell.ground
+circuit.mat[6][5] = cpu.Cell.conductor
+circuit.mat[6][6] = cpu.Cell.conductor
+circuit.mat[6][7] = cpu.Cell.transistor
+circuit.mat[6][8] = cpu.Cell.conductor
+circuit.mat[6][9] = cpu.Cell.conductor
+circuit.mat[6][10] = cpu.Cell.conductor
+circuit.mat[5][10] = cpu.Cell.conductor
+circuit.mat[4][10] = cpu.Cell.conductor
+circuit.mat[3][10] = cpu.Cell.conductor
+circuit.mat[3][9] = cpu.Cell.conductor
+circuit.mat[3][8] = cpu.Cell.conductor
+circuit.mat[3][7] = cpu.Cell.conductor
+circuit.mat[4][7] = cpu.Cell.conductor
+circuit.mat[5][7] = cpu.Cell.transistor_gate
+circuit.mat[5][11] = cpu.Cell.live
+
+circuit.generate_groups()
+circuit.update_transistors()
 
 resize(res)
 pres = pygame.display.list_modes()[0]
@@ -91,6 +111,7 @@ while running:
 			if   event.key == K_ESCAPE: running = False
 			elif event.key == K_F11: toggleFullscreen()
 			elif event.key == K_g: circuit.generate_groups()
+			elif event.key == K_t: circuit.update_transistors()
 
 		elif event.type == VIDEORESIZE:
 			if not display.get_flags()&FULLSCREEN: resize(event.size)
@@ -115,8 +136,8 @@ while running:
 					circuit.mat[y][x] = paint_mode
 			elif event.button == 3:
 				x, y = from_screen_space(event.pos, view_rect, size)
-				if (x, y) in circuit.groups:
-					selected_group = circuit.groups[x, y]
+				if (x, y) in circuit.static_groups:
+					selected_group = circuit.static_groups[x, y].get_override()
 		elif event.type == MOUSEBUTTONUP:
 			if event.button == 1:
 				dragging = False
