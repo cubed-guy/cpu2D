@@ -1,6 +1,7 @@
 # 2d cpu simulator
 
 import pygame
+from pygame.locals import SRCALPHA, BLEND_RGBA_MULT
 
 c = type('c', (), {'__matmul__': (lambda s, x: (*x.to_bytes(3, 'big'),)), '__sub__': (lambda s, x: (x&255,)*3)})()
 
@@ -347,8 +348,10 @@ class Circuit:
 		TransistorState.closed: c@0x608f33,
 	}
 
-	def render(self, size, rect, highlighted_group = None):
-		out = pygame.Surface(rect.size)
+	def render(
+		self, size, rect, highlighted_group = None, *, selected_region = None
+	):
+		out = pygame.Surface(rect.size, SRCALPHA)
 		out.fill(c@0xffe800)
 
 		for y, row in enumerate(self.mat):
@@ -393,7 +396,23 @@ class Circuit:
 				else:
 					colour = self.cell_colours.get(cell, c@0xff00ff),
 
-				out.fill(colour, cell_rect.clip(rect).move(1-rect.left, 1-rect.top).inflate(-1, -1))
+				fill_rect = (
+					cell_rect
+					.clip(rect)
+					.move(1-rect.left, 1-rect.top)
+					.inflate(-1, -1)
+				)
+
+				out.fill(colour, fill_rect)
+
+				if selected_region is not None:
+					if x in range(
+						selected_region[0][0], selected_region[1][0] + 1
+					):
+						if y in range(
+							selected_region[0][1], selected_region[1][1] + 1
+						):
+							out.fill(c-225, fill_rect, special_flags=BLEND_RGBA_MULT)
 
 		return out
 

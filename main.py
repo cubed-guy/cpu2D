@@ -9,6 +9,8 @@
 from os import environ
 environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
 
+from enum import Enum, auto
+
 import cpu
 import pygame
 from pygame.locals import *
@@ -32,7 +34,7 @@ def updateStat(msg = None, update = True):
 
 	mouse_pos = pygame.mouse.get_pos()
 	cell = from_screen_space(mouse_pos, view_rect, size)
-	tsurf = sfont.render(msg or f'{cell} {paint_mode} {type(selected_group)}', True, c--1)
+	tsurf = sfont.render(msg or f'{cell} {paint_mode} {type(selected_group)} {copy_region} {copy_mode}', True, c--1)
 	display.blit(tsurf, (5, h-20))
 
 	if update: pygame.display.update(rect)
@@ -47,7 +49,10 @@ def resize(size):
 def updateDisplay():
 	display.fill(bg)
 
-	surf = circuit.render(size, view_rect, selected_group)
+	if copy_mode in (CopyMode.select, CopyMode.ready):
+		surf = circuit.render(size, view_rect, selected_group, selected_region=copy_region)
+	else:
+		surf = circuit.render(size, view_rect, selected_group)
 	display.blit(surf, (0, 0))
 
 	updateStat(update = False)
@@ -68,6 +73,12 @@ def from_screen_space(screen_pos, ref_rect, ref_size):
 	y = screen_pos[1] + ref_rect.top
 
 	return x // size, y // size
+
+class CopyMode(Enum):
+	inactive = auto()
+	active = auto()
+	select = auto()
+	ready = auto()
 
 view_rect = pygame.Rect(440, 220, w, h)
 dragging = False
@@ -131,6 +142,9 @@ circuit.generate_groups()
 circuit.update_transistors()
 circuit.update_resistor_groups()
 
+copy_region = None
+copy_mode = CopyMode.inactive
+
 resize(res)
 pres = pygame.display.list_modes()[0]
 # pygame.key.set_repeat(500, 50)
@@ -139,11 +153,16 @@ running = True
 while running:
 	for event in pygame.event.get():
 		if event.type == KEYDOWN:
-			if   event.key == K_ESCAPE: running = False
+			if   event.key == K_ESCAPE:
+				if copy_mode is not CopyMode.inactive:
+					copy_mode = CopyMode.inactive
+				else:
+					running = False
 			elif event.key == K_F11: toggleFullscreen()
 			elif event.key == K_g: circuit.generate_groups()
 			elif event.key == K_s: print(end=circuit.generate_source())
 			elif event.key == K_r: circuit.update_resistor_groups()
+			elif event.key == K_c: copy_mode = CopyMode.active
 			elif event.key == K_t:
 				circuit.update_transistors()
 				if not event.mod & (KMOD_LSHIFT|KMOD_RSHIFT):
@@ -183,15 +202,43 @@ while running:
 					val += 1
 					paint_mode = cpu.Cell(val)
 
-				key_mods = pygame.key.get_mods()
-				if key_mods & (KMOD_LALT|KMOD_RALT):
-					x, y = from_screen_space(event.pos, view_rect, size)
-					paint_mode = circuit.mat[y][x]
+			elif event.button == 1:
+				click_pos = from_screen_space(event.pos, view_rect, size)
+
+				if copy_mode is CopyMode.active:
+					copy_region = [click_pos, click_pos]
+					copy_mode = CopyMode.select
+				elif copy_mode is CopyMode.ready:
+					# paste
+
+					copy_h = copy_region[1][1] - copy_region[0][1] + 1
+					copy_w = copy_region[1][0] - copy_region[0][0] + 1
+
+					# no overlap safety.
+					# The simplest type of copy will work
+					for dest_row, src_row in zip(
+						circuit.mat[click_pos[1]:click_pos[1] + copy_h],
+						circuit.mat[copy_region[0][1]:copy_region[1][1]+1],
+					):
+
+						print('Copied one row')
+						dest_row[click_pos[0]:click_pos[0] + copy_w] = (
+							src_row[copy_region[0][0]:copy_region[1][0]+1]
+						)
+
+					print('Pasted', copy_w, 'x', copy_h)
+
+					copy_mode = CopyMode.inactive
 				else:
-					dragging = True
-					if not pygame.key.get_mods() & (KMOD_LSHIFT|KMOD_RSHIFT):
-						x, y = from_screen_space(event.pos, view_rect, size)
-						circuit.mat[y][x] = paint_mode
+					key_mods = pygame.key.get_mods()
+					if key_mods & (KMOD_LALT|KMOD_RALT):
+						x, y = click_pos
+						paint_mode = circuit.mat[y][x]
+					else:
+						dragging = True
+						if not pygame.key.get_mods()&(KMOD_LSHIFT|KMOD_RSHIFT):
+							x, y = click_pos
+							circuit.mat[y][x] = paint_mode
 			elif event.button == 3:
 				x, y = from_screen_space(event.pos, view_rect, size)
 				if (x, y) in circuit.static_groups:
@@ -199,11 +246,18 @@ while running:
 		elif event.type == MOUSEBUTTONUP:
 			if event.button == 1:
 				dragging = False
+				if copy_mode is CopyMode.select:
+					copy_mode = CopyMode.ready
 			elif event.button == 3:
 				x, y = from_screen_space(event.pos, view_rect, size)
 				selected_group = None
 		elif event.type == MOUSEMOTION:
-			if dragging:
+			if copy_mode is CopyMode.select:
+				if copy_region:
+					copy_region[1] = (
+						from_screen_space(event.pos, view_rect, size)
+					)
+			elif dragging:
 				if pygame.key.get_mods() & (KMOD_LSHIFT|KMOD_RSHIFT):
 					view_rect.move_ip(-event.rel[0], -event.rel[1])
 				else:
