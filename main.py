@@ -76,11 +76,10 @@ ticks = 0
 selected_group = None
 size = 64
 paint_mode = cpu.Cell.conductor
-
 circuit = cpu.Circuit(500, 500)
 
 circuit.mat[4][12] = cpu.Cell.live
-circuit.mat[4][20] = cpu.Cell.live
+circuit.mat[4][20] = cpu.Cell.ground
 circuit.mat[5][12] = cpu.Cell.conductor
 circuit.mat[5][20] = cpu.Cell.conductor
 circuit.mat[6][12] = cpu.Cell.conductor
@@ -129,7 +128,8 @@ circuit.mat[14][11] = cpu.Cell.ground
 circuit.mat[14][19] = cpu.Cell.live
 
 circuit.generate_groups()
-# circuit.update_transistors()
+circuit.update_transistors()
+circuit.update_resistor_groups()
 
 resize(res)
 pres = pygame.display.list_modes()[0]
@@ -142,8 +142,12 @@ while running:
 			if   event.key == K_ESCAPE: running = False
 			elif event.key == K_F11: toggleFullscreen()
 			elif event.key == K_g: circuit.generate_groups()
-			elif event.key == K_t: circuit.update_transistors()
 			elif event.key == K_s: print(end=circuit.generate_source())
+			elif event.key == K_r: circuit.update_resistor_groups()
+			elif event.key == K_t:
+				circuit.update_transistors()
+				if not event.mod & (KMOD_LSHIFT|KMOD_RSHIFT):
+					circuit.update_resistor_groups()
 			elif event.key == K_i:
 				mouse_pos = pygame.mouse.get_pos()
 				x, y = from_screen_space(mouse_pos, view_rect, size)
@@ -179,7 +183,6 @@ while running:
 					val += 1
 					paint_mode = cpu.Cell(val)
 
-			elif event.button == 1:
 				key_mods = pygame.key.get_mods()
 				if key_mods & (KMOD_LALT|KMOD_RALT):
 					x, y = from_screen_space(event.pos, view_rect, size)
