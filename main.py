@@ -23,7 +23,7 @@ green = c@0xa0ffe0
 
 fps = 60
 
-w, h = res = (1280, 720)
+w, h = res = (1280, 800)
 
 def updateStat(msg = None, update = True):
 	# call this if you have a long loop that'll taking too long
@@ -32,7 +32,7 @@ def updateStat(msg = None, update = True):
 
 	mouse_pos = pygame.mouse.get_pos()
 	cell = from_screen_space(mouse_pos, view_rect, size)
-	tsurf = sfont.render(msg or f'{cell} {paint_mode}', True, c--1)
+	tsurf = sfont.render(msg or f'{cell} {paint_mode} {type(selected_group)}', True, c--1)
 	display.blit(tsurf, (5, h-20))
 
 	if update: pygame.display.update(rect)
@@ -69,36 +69,67 @@ def from_screen_space(screen_pos, ref_rect, ref_size):
 
 	return x // size, y // size
 
-view_rect = pygame.Rect(0, 0, w, h)
+view_rect = pygame.Rect(440, 220, w, h)
 dragging = False
 ticks = 0
 
 selected_group = None
 size = 64
-paint_mode = cpu.Cell.ground
-print(paint_mode)
+paint_mode = cpu.Cell.conductor
 
 circuit = cpu.Circuit(500, 500)
 
-circuit.mat[6][4] = cpu.Cell.ground
-circuit.mat[6][5] = cpu.Cell.conductor
-circuit.mat[6][6] = cpu.Cell.conductor
-circuit.mat[6][7] = cpu.Cell.transistor
-circuit.mat[6][8] = cpu.Cell.conductor
-circuit.mat[6][9] = cpu.Cell.conductor
-circuit.mat[6][10] = cpu.Cell.conductor
-circuit.mat[5][10] = cpu.Cell.conductor
-circuit.mat[4][10] = cpu.Cell.conductor
-circuit.mat[3][10] = cpu.Cell.conductor
-circuit.mat[3][9] = cpu.Cell.conductor
-circuit.mat[3][8] = cpu.Cell.conductor
-circuit.mat[3][7] = cpu.Cell.conductor
-circuit.mat[4][7] = cpu.Cell.conductor
-circuit.mat[5][7] = cpu.Cell.transistor_gate
-circuit.mat[5][11] = cpu.Cell.live
+circuit.mat[4][12] = cpu.Cell.live
+circuit.mat[4][20] = cpu.Cell.live
+circuit.mat[5][12] = cpu.Cell.conductor
+circuit.mat[5][20] = cpu.Cell.conductor
+circuit.mat[6][12] = cpu.Cell.conductor
+circuit.mat[6][18] = cpu.Cell.ground
+circuit.mat[6][20] = cpu.Cell.conductor
+circuit.mat[7][10] = cpu.Cell.ground
+circuit.mat[7][12] = cpu.Cell.transistor_gate
+circuit.mat[7][18] = cpu.Cell.conductor
+circuit.mat[7][20] = cpu.Cell.transistor_gate
+circuit.mat[8][10] = cpu.Cell.resistor
+circuit.mat[8][11] = cpu.Cell.conductor
+circuit.mat[8][12] = cpu.Cell.transistor
+circuit.mat[8][13] = cpu.Cell.conductor
+circuit.mat[8][18] = cpu.Cell.resistor
+circuit.mat[8][19] = cpu.Cell.conductor
+circuit.mat[8][20] = cpu.Cell.transistor
+circuit.mat[8][21] = cpu.Cell.conductor
+circuit.mat[9][11] = cpu.Cell.transistor_gate
+circuit.mat[9][13] = cpu.Cell.transistor
+circuit.mat[9][14] = cpu.Cell.live
+circuit.mat[9][19] = cpu.Cell.transistor_gate
+circuit.mat[9][21] = cpu.Cell.transistor
+circuit.mat[9][22] = cpu.Cell.conductor
+circuit.mat[9][23] = cpu.Cell.live
+circuit.mat[10][10] = cpu.Cell.live
+circuit.mat[10][11] = cpu.Cell.transistor
+circuit.mat[10][12] = cpu.Cell.conductor
+circuit.mat[10][13] = cpu.Cell.transistor_gate
+circuit.mat[10][17] = cpu.Cell.live
+circuit.mat[10][18] = cpu.Cell.conductor
+circuit.mat[10][19] = cpu.Cell.transistor
+circuit.mat[10][20] = cpu.Cell.conductor
+circuit.mat[10][21] = cpu.Cell.transistor_gate
+circuit.mat[11][11] = cpu.Cell.transistor_gate
+circuit.mat[11][13] = cpu.Cell.resistor
+circuit.mat[11][14] = cpu.Cell.ground
+circuit.mat[11][19] = cpu.Cell.transistor_gate
+circuit.mat[11][21] = cpu.Cell.resistor
+circuit.mat[11][22] = cpu.Cell.conductor
+circuit.mat[11][23] = cpu.Cell.ground
+circuit.mat[12][11] = cpu.Cell.conductor
+circuit.mat[12][19] = cpu.Cell.conductor
+circuit.mat[13][11] = cpu.Cell.conductor
+circuit.mat[13][19] = cpu.Cell.conductor
+circuit.mat[14][11] = cpu.Cell.ground
+circuit.mat[14][19] = cpu.Cell.live
 
 circuit.generate_groups()
-circuit.update_transistors()
+# circuit.update_transistors()
 
 resize(res)
 pres = pygame.display.list_modes()[0]
@@ -112,6 +143,26 @@ while running:
 			elif event.key == K_F11: toggleFullscreen()
 			elif event.key == K_g: circuit.generate_groups()
 			elif event.key == K_t: circuit.update_transistors()
+			elif event.key == K_s: print(end=circuit.generate_source())
+			elif event.key == K_i:
+				mouse_pos = pygame.mouse.get_pos()
+				x, y = from_screen_space(mouse_pos, view_rect, size)
+
+				if (x, y) not in circuit.static_groups: continue
+
+				print('GROUP INFO')
+
+				static_group = circuit.static_groups[x, y]
+				print(static_group)
+				if static_group.override is None: print(); continue
+
+				dyn_group = static_group.override
+				print(dyn_group)
+				if dyn_group.resistor_override is None: print(); continue
+
+				print(dyn_group.resistor_override)
+
+				print()
 
 		elif event.type == VIDEORESIZE:
 			if not display.get_flags()&FULLSCREEN: resize(event.size)
@@ -121,23 +172,27 @@ while running:
 			if event.button in (4, 5):
 				delta = event.button*2-9
 				if pygame.key.get_mods() & (KMOD_LCTRL|KMOD_RCTRL):
-					size += delta
+					size -= delta
 				else:
 					val = paint_mode.value + delta - 1
 					val %= len(cpu.Cell)
 					val += 1
 					paint_mode = cpu.Cell(val)
-					print(paint_mode.value, paint_mode)
 
 			elif event.button == 1:
-				dragging = True
-				if not pygame.key.get_mods() & (KMOD_LSHIFT|KMOD_RSHIFT):
+				key_mods = pygame.key.get_mods()
+				if key_mods & (KMOD_LALT|KMOD_RALT):
 					x, y = from_screen_space(event.pos, view_rect, size)
-					circuit.mat[y][x] = paint_mode
+					paint_mode = circuit.mat[y][x]
+				else:
+					dragging = True
+					if not pygame.key.get_mods() & (KMOD_LSHIFT|KMOD_RSHIFT):
+						x, y = from_screen_space(event.pos, view_rect, size)
+						circuit.mat[y][x] = paint_mode
 			elif event.button == 3:
 				x, y = from_screen_space(event.pos, view_rect, size)
 				if (x, y) in circuit.static_groups:
-					selected_group = circuit.static_groups[x, y].get_override()
+					selected_group = circuit.static_groups[x, y].get_resistor_override()
 		elif event.type == MOUSEBUTTONUP:
 			if event.button == 1:
 				dragging = False

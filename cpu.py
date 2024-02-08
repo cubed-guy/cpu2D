@@ -7,25 +7,31 @@ c = type('c', (), {'__matmul__': (lambda s, x: (*x.to_bytes(3, 'big'),)), '__sub
 from enum import Enum, auto
 
 class Cell(Enum):
-	# inputs
-	live = auto()
-	ground = auto()
-
-	# conductor states
 	conductor = auto()
-
-	# misc
-	insulator = auto()
-	resistor = auto()
-	overlap = auto()
 	transistor_gate = auto()
 	transistor = auto()
+	resistor = auto()
+	overlap = auto()
+
+	insulator = auto()
+	live = auto()
+	ground = auto()
 
 	def get_conductor_value(self):
 		if self is self.__class__.live: return ConductorValue.hi
 		if self is self.__class__.ground: return ConductorValue.lo
 
 		return ConductorValue.z
+
+conductors = (Cell.conductor, Cell.transistor_gate)
+sources = (Cell.live, Cell.ground)
+
+class ConductorValue(Enum):
+	hi = auto()
+	lo = auto()
+	mid = auto()
+	x = auto()
+	z = auto()
 
 class TransistorState(Enum):
 	closed = auto()
@@ -37,19 +43,16 @@ class Transistor:
 		self.groups = []
 		self.state = TransistorState.closed
 
-class ConductorValue(Enum):
-	hi = auto()
-	lo = auto()
-	mid = auto()
-	x = auto()
-	z = auto()
+class Resistor:
+	def __init__(self):
+		self.groups: WireGroup = []
 
 class WireGroup:
 	id = 0
 
 	def __init__(self):
 		self.sources = set()
-		self.resistor_sources = set()
+		self.resistors = set()
 		self.transistors = set()
 		self.transistor_gates = set()
 		self.cells = set()
@@ -57,13 +60,23 @@ class WireGroup:
 		self.__class__.id += 1
 		self.override = None
 
+	def __str__(self):
+		return (
+			f'StaticGroup {{\n'
+			f'\t{len(self.sources)} sources\n'
+			f'\t{len(self.resistors)} resistors\n'
+			f'\t{len(self.transistors)} transistors\n'
+			f'\toverride = {self.override is not None}\n'
+			'}'
+		)
+
 	def __hash__(self):
 		return self.id.__hash__()
 
 	def __ior__(self, other):
 		self.cells |= other.cells
 		self.sources |= other.sources
-		self.resistor_sources |= other.resistor_sources
+		self.resistors |= other.resistors
 		self.transistors |= other.transistors
 		self.transistor_gates |= other.transistor_gates
 
@@ -73,10 +86,19 @@ class WireGroup:
 		if self.override is None: return self
 		return self.override
 
+	def get_resistor_override(self) -> 'WireGroup | DynamicWireGroup | ResistorWireGroup':
+		if self.override is None: return self
+		dyn_group = self.override
+		if dyn_group.resistor_override is None: return dyn_group
+		return dyn_group.resistor_override
+
+	def is_source(self):
+		return not not self.sources
+
 	def dyn_copy(self):
 		out = DynamicWireGroup()
 		out.sources = self.sources.copy()
-		out.resistor_sources = self.resistor_sources.copy()
+		out.resistors = self.resistors.copy()
 		out.transistors = self.transistors.copy()
 		out.transistor_gates = self.transistor_gates.copy()
 
@@ -95,27 +117,27 @@ class WireGroup:
 
 		if val is not ConductorValue.z: return val
 
-		for group in self.resistor_sources:
-			print('WARNING: potential recursion at', next(iter(group.cells)))
-
-			source_value = group.get_value(circuit)  # this may cause a recursion when there are resistors?
-
-			if source_value is ConductorValue.z: continue
-			if val is ConductorValue.x: continue
-
-			if val is ConductorValue.z: val = source_value
-			elif source_value is ConductorValue.x: val = ConductorValue.x; break
-			elif source_value is not val: val = ConductorValue.mid
-
 		return val
 
 class DynamicWireGroup:
 	def __init__(self):
 		self.sources = set()
-		self.resistor_sources = set()
+		self.resistors = set()
 		self.transistors = set()
 		self.transistor_gates = set()
 		self.groups = set()  # we need this so we can update the overrides
+		self.resistor_override = None
+
+
+	def __str__(self):
+		return (
+			f'DynamicGroup {{\n'
+			f'\t{len(self.sources)} sources\n'
+			f'\t{len(self.resistors)} resistors\n'
+			f'\t{len(self.transistors)} transistors\n'
+			f'\toverride = {self.resistor_override is not None}\n'
+			'}'
+		)
 
 	def __hash__(self):
 		# if a == b then hash(a) == hash(b)
@@ -126,13 +148,13 @@ class DynamicWireGroup:
 	# 	out = self.__class__()
 	# 	out.groups = self.groups | other.groups
 	# 	out.sources = self.sources | other.sources
-	# 	out.resistor_sources = self.resistor_sources | other.resistor_sources
+	# 	out.resistors = self.resistors | other.resistors
 	# 	return out
 
 	def __ior__(self, other):
 		self.groups |= other.groups
 		self.sources |= other.sources
-		self.resistor_sources |= other.resistor_sources
+		self.resistors |= other.resistors
 		self.transistors |= other.transistors
 		self.transistor_gates |= other.transistor_gates
 
@@ -143,9 +165,12 @@ class DynamicWireGroup:
 
 		self.groups.add(static_group)
 		self.sources |= static_group.sources
-		self.resistor_sources |= static_group.resistor_sources
+		self.resistors |= static_group.resistors
 		self.transistors |= static_group.transistors
 		self.transistor_gates |= static_group.transistor_gates
+
+	def is_source(self):
+		return not not self.sources
 
 	def get_value(self, circuit) -> ConductorValue:
 		val = ConductorValue.z
@@ -160,8 +185,89 @@ class DynamicWireGroup:
 
 		if val is not ConductorValue.z: return val
 
-		for group in self.resistor_sources:
+		return val
+
+
+class ResistorWireGroup:
+	def __init__(self):
+		self.sources = set()
+		self.dynamic_groups = set()
+		self.transistors = set()
+		self.transistor_gates = set()
+
+	def __str__(self):
+		return (
+			f'ResistorGroup {{\n'
+			f'\t{len(self.sources)} sources\n'
+			f'\t{len(self.transistors)} transistors\n'
+			'}'
+		)
+
+	def __hash__(self):
+		# if a == b then hash(a) == hash(b)
+		# if hash(a) == hash(b) then a and b may or may not be equal
+		return id(self).__hash__()
+
+	# def __or__(self, other):
+	# 	out = self.__class__()
+	# 	out.groups = self.groups | other.groups
+	# 	out.sources = self.sources | other.sources
+	# 	out.resistors = self.resistors | other.resistors
+	# 	return out
+
+	def __ior__(self, other):
+		self.sources |= other.sources
+		self.dynamic_groups |= other.dynamic_groups
+
+		return self
+
+	def subtract_dyn(self, dyn_group, circuit):
+		self.dynamic_groups.remove(dyn_group)
+
+		self.update_source_groups(circuit)
+
+		return self
+
+	def update_source_groups(self, circuit):
+		'''
+		given the dynamic groups that comprise the resistor group
+		return the set of all groups that are connected to sources
+		'''
+
+		self.sources.clear()
+
+		# we assume that the dyn_group has no sources conneccted to it
+		for dyn_group in self.dynamic_groups:
+			for resistor_pos in dyn_group.resistors:
+				resisitor = circuit.resistors[resistor_pos]
+				for group in resistor.groups:
+					group = group.get_override()
+					if group.is_source():
+						self.sources.add(group)
+
+	def merge_static(self, static_group):
+		print('Merging with the static group:', static_group)
+
+		dyn_group = static_group.dyn_copy()
+		static_group.override = dyn_group
+
+		self.merge_dynamic(dyn_group)
+
+	def merge_dynamic(self, dyn_group):
+		print('Merging with the dynamic group:', dyn_group)
+
+		self.dynamic_groups.add(dyn_group)
+		# self.resistors |= dyn_group.resistors
+		self.transistors |= dyn_group.transistors
+		self.transistor_gates |= dyn_group.transistor_gates
+
+	def get_value(self, circuit) -> ConductorValue:
+		val = ConductorValue.z
+
+		for group_pos in self.sources:
 			print('WARNING: potential recursion at', next(iter(group.cells)))
+
+			group = self.mat[group_pos].get_override()
 
 			source_value = group.get_value(circuit)  # this may cause a recursion when there are resistors?
 
@@ -178,6 +284,8 @@ class Clock(Enum):
 	lo = auto()
 	hi = auto()
 
+class ActiveGate: ...
+
 class Circuit:
 	def __init__(self, w, h):
 		self.w = w
@@ -185,6 +293,7 @@ class Circuit:
 		self.mat: list[list[Cell]] = [[Cell.insulator]*w for _ in range(h)]
 		self.static_groups: dict[(int, int), WireGroup] = {}  # separated by everything
 		self.transistors: dict[(int, int), Transistor] = {}
+		self.resistors: dict[(int, int), Resistors] = {}
 
 	cell_colours = {
 		Cell.live: c@0x71f2ff,
@@ -202,6 +311,8 @@ class Circuit:
 		Cell.overlap: c@0x742500,
 		Cell.transistor_gate: c@0xde5562,
 		Cell.transistor: c@0x608f33,
+
+		ActiveGate: c@0xff9ec9,
 
 		TransistorState.open: c@0x9ce652,
 		TransistorState.closed: c@0x608f33,
@@ -225,12 +336,28 @@ class Circuit:
 				cell_rect = pygame.Rect(x * size, y * size, size, size)
 
 				if cell is Cell.conductor and (x, y) in self.static_groups:
-					group = self.static_groups[x, y].get_override()
+					group = self.static_groups[x, y].get_resistor_override()
 
-					if group is highlighted_group: colour = c-192
+					if group is highlighted_group:
+						if isinstance(group, ResistorWireGroup): colour = c-192
+						elif isinstance(group, DynamicWireGroup): colour = c@0xffae29
+						else: colour = c@0xf6ddb5
 					else:
 						val = group.get_value(self)
 						colour = self.cell_colours.get(val, c@0xff00ff),
+				elif cell is Cell.transistor_gate and (x, y) in self.static_groups:
+					group = self.static_groups[x, y].get_resistor_override()
+
+					if group is highlighted_group:
+						if isinstance(group, ResistorWireGroup): colour = c-150
+						elif isinstance(group, DynamicWireGroup): colour = c@0xc0ae29
+						else: colour = c@0xc6ad75
+					else:
+						val = group.get_value(self)
+						if val is ConductorValue.hi:
+							colour = self.cell_colours[ActiveGate]
+						else:
+							colour = self.cell_colours[cell]
 				elif cell is Cell.transistor and (x, y) in self.transistors:
 					state = self.transistors[x, y].state
 					colour = self.cell_colours.get(state, c@0xff00ff),
@@ -244,17 +371,26 @@ class Circuit:
 	# we need to be able to get the set of all cells that belong to a group
 	# we need to be able to get the group given a pixel
 
+	def update_group_data(self, cell, group, x, y):
+		ncell = self.mat[y][x]
+
+		if ncell in sources:
+			group.sources.add((x, y))
+		elif ncell is Cell.transistor:
+			if cell is Cell.transistor_gate:
+				group.transistor_gates.add((x, y))
+			else:
+				group.transistors.add((x, y))
+		elif ncell is Cell.resistor:
+			group.resistors.add((x, y))
+
 	def generate_groups(self):
 		self.static_groups = {}  # mapping from cells to groups
 		self.transistors = {}  # mapping from cells to groups
 		merges = 0
 		n_groups = 0
 
-		conductors = (Cell.conductor, Cell.transistor_gate)
-		sources = (Cell.live, Cell.ground)
-
 		for y, row in enumerate(self.mat):
-
 			for x, cell in enumerate(row):
 				if cell in conductors:
 
@@ -286,41 +422,23 @@ class Circuit:
 					# print('Populated', (x, y))
 					group.cells.add((x, y))
 
-					if x > 0:
-						if self.mat[y][x-1] in sources:
-							group.sources.add((x-1, y))
-						elif self.mat[y][x-1] is Cell.transistor:
-							if cell is Cell.transistor_gate:
-								group.transistor_gates.add((x-1, y))
-							else:
-								group.transistors.add((x-1, y))
-					if y > 0:
-						if self.mat[y-1][x] in sources:
-							group.sources.add((x, y-1))
-						elif self.mat[y-1][x] is Cell.transistor:
-							if cell is Cell.transistor_gate:
-								group.transistor_gates.add((x, y-1))
-							else:
-								group.transistors.add((x, y-1))
+					if x > 0: self.update_group_data(cell, group, x-1, y)
+					if y > 0: self.update_group_data(cell, group, x, y-1)
+					if x < len(self.mat[0]): self.update_group_data(cell, group, x+1, y)
+					if y < len(self.mat): self.update_group_data(cell, group, x, y+1)
 
-					if x < len(self.mat[0]):
-						if self.mat[y][x+1] in sources:
-							group.sources.add((x+1, y))
-						elif self.mat[y][x+1] is Cell.transistor:
-							if cell is Cell.transistor_gate:
-								group.transistor_gates.add((x+1, y))
-							else:
-								group.transistors.add((x+1, y))
-					if y < len(self.mat):
-						if self.mat[y+1][x] in sources:
-							group.sources.add((x, y+1))
-						elif self.mat[y+1][x] is Cell.transistor:
-							if cell is Cell.transistor_gate:
-								group.transistor_gates.add((x, y+1))
-							else:
-								group.transistors.add((x, y+1))
-						# if self.mat[y][x-1] is Cell.resistor:
-						# 	group.resistor_sources.add((x, y-1))
+				elif cell is Cell.resistor:
+					resistor = Resistor()
+					self.resistors[x, y] = resistor
+
+					if x > 0 and self.mat[y][x-1] in conductors:
+						resistor.groups.append((x-1, y))
+					if y > 0 and self.mat[y][x-1] in conductors:
+						resistor.groups.append((x, y-1))
+					if x < len(self.mat[0]) and self.mat[y][x-1] in conductors:
+						resistor.groups.append((x+1, y))
+					if y < len(self.mat) and self.mat[y][x-1] in conductors:
+						resistor.groups.append((x, y+1))
 
 				elif cell is Cell.transistor:
 					transistor = Transistor()
@@ -423,7 +541,7 @@ class Circuit:
 			else:
 				raise ValueError(f'Invalid transistor state: {new_state!r}')
 
-	def find_dyn(self, root_group):
+	def find_dyn(self, root_group: WireGroup):
 		out = DynamicWireGroup()
 
 		queue = [root_group]
@@ -432,7 +550,7 @@ class Circuit:
 			if group in out.groups: continue  # already merged
 
 			out.merge_static(group)
-			group.override = out
+			# group.override = out
 			print('Adding to disconnected dynamic group:', group.cells)
 			print('Dynamic group now has transistors at:', out.transistors)
 			print('Static group now has transistors at:', group.transistors)
@@ -450,3 +568,16 @@ class Circuit:
 						queue.append(ripple_group)
 
 		return out
+
+
+	import io
+	def generate_source(self):
+		out = self.io.StringIO()
+		for y, row in enumerate(self.mat):
+			for x, cell in enumerate(row):
+				if cell is Cell.insulator: continue
+				print(f'circuit.mat[{y}][{x}] = {cell}', file=out)
+
+		return out.getvalue()
+
+if __name__ == '__main__': import main
