@@ -517,21 +517,34 @@ class Circuit:
 					# nothing through transistors (never anyways)
 					# nothing with overlaps
 
-					if x >= 0 and self.mat[y][x-1] in conductors:
-						group = self.static_groups[x-1, y]
+
+					for ox in range(x-1, -1, -1):
+						if self.mat[y][ox] is not Cell.overlap:
+							left_pos = ox, y
+							break
+					else: left_pos = None
+
+					for oy in range(y-1, -1, -1):
+						if self.mat[oy][x] is not Cell.overlap:
+							top_pos = x, oy
+							break
+					else: top_pos = None
+
+					if left_pos is not None and self.mat[y][ox] in conductors:
+						group = self.static_groups[ox, y]
 
 						# merge two groups
-						if y >= 0 and self.mat[y-1][x] in conductors:
+						if top_pos is not None and self.mat[oy][x] in conductors:
 							merges += 1
 
-							group2 = self.static_groups[x, y-1]
+							group2 = self.static_groups[x, oy]
 							if group is not group2:
 								group |= group2
 								for cell in group2.cells:
 									self.static_groups[cell] = group
 
-					elif y >= 0 and self.mat[y-1][x] in conductors:
-						group = self.static_groups[x, y-1]
+					elif top_pos is not None and self.mat[oy][x] in conductors:
+						group = self.static_groups[x, oy]
 					else:
 						n_groups += 1
 						group = WireGroup()
@@ -624,108 +637,106 @@ class Circuit:
 			# transistor update code won't be in transistor
 			# it'll be here.
 
-			if new_state is TransistorState.open:
-				# merge groups
-				merged = DynamicWireGroup()
+			if new_state is TransistorState.closed:
+				was_source = False
+				dyn_groups = []  # these groups shall form a resistor group
 
-				'''
-				After the dynamic groups have been merges,
-				we must attend to the resistor groups.
-				'''
+				for group_pos in transistor.groups:
+					group = self.groups[group_pos]
 
-				resistor_merged = ResistorWireGroup()
+					dyn_group = self.find_dyn(group)
+					for group in dyn_group.groups: group.override = dyn_group
 
-				for pos in transistor.groups:
-					group = self.static_groups[pos]
-					if group.override is not None:
-						# self.dynamic_groups.remove(group.override)
-						dyn_group = group.override
-
-						merged |= dyn_group
-
-						# TODO: merge resistor groups
-						if resistor_merged is None: continue
-
-						if dyn_group.is_source():
-							# At least one sourced group. This means no resistor group.
-							resistor_merged = None  # subtract later
-						elif dyn_group.resistor_override is not None:
-							# Sources also get merged here. Good
-							resistor_merged |= dyn_group.resistor_override
-						else:
-							resistor_merged.merge_dynamic(dyn_group)
-
+					if dyn_group.is_source():
+						was_source = True
 					else:
-						merged.merge_static(group)
+						dyn_groups.append(dyn_group)
 
-						if resistor_merged is None: continue
-						if group.is_source():
-							resistor_merged = None
-						else:
-							resistor_merged.merge_static(group)
+				if was_source:
+					for dyn_group in dyn_groups:
+						# return the dyn_groups back to the res_groups
+						# the difference is that we don't search out far and wide
+						# we just look at our neighbours
+						merged_res_group = ResistorWireGroup()
+						merged_res_group.merge_dynamic(dyn_group)
 
-				for static_group in merged.groups:
-					static_group.override = merged
+						for resistor_pos in dyn_group.resistors:
+							# merge the resistor_groups
+							group = self.groups[resistor_group]
 
-				if resistor_merged is None:
-					# iterate through each group and subtract merged
-					# then update the sources, because subtraction won't be that simple
-					# as in, simply subtracting the sources won't suffice
+							if group.override is None: raise Exception('uhh, group should have an override')
+							dyn_group = group.override
 
-					for resistor_pos in merged.resistors:
-						resistor = self.resistors[resistor_pos]
-						print(f'resistor at {resistor_pos} = Resistor({resistor.groups})')
-						for outer_group_pos in resistor.groups:
-							# for every static group connected through
-							# a resistor from this source group
+							if dyn_group.is_source(): continue
+							if dyn_group.resistor_override is None: raise Exception("if there ain't a source, why is it not a res?")
 
-							# Conductors are at these spots: (12, 5) (20, 5) (12, 6) (20, 6) (12, 7) (18, 7) (20, 7) (11, 8) (13, 8) (19, 8) (21, 8) (11, 9) (19, 9) (22, 9) (12, 10) (13, 10) (18, 10) (20, 10) (21, 10) (11, 11) (19, 11) (22, 11) (11, 12) (19, 12) (11, 13) (19, 13)
-							# print('Conductors are at these spots:', *self.static_groups)
-							outer_group = self.static_groups[outer_group_pos]
-							dyn_outer_group = outer_group.get_override()
-							if dyn_outer_group.is_source(): continue
+							merged_res_group |= dyn_group.resistor_override
 
-							# Finds all the dynamic_groups that are connected
-							# through resistors and open transistors.
-							# Stops ripple if it finds a source.
-							# Adds that to sources instead.
-							resistor_group = self.find_res(dyn_outer_group)
-
-							for dynamic_group in resistor_group.dynamic_groups:
-								dynamic_group.resistor_override = resistor_group
-								for static_group in dynamic_group.static_groups:
-									static_group.override = dynamic_group
-
-						# find the sources? that'll be handled by find_res()
-
-					for updated_transistor in merged.transistor_gates:
-						queue.append(updated_transistor)
+						for dyn_group in merged_res_group.dyn_groups:
+							dyn_group.resistor_override = res_group
 
 				else:
-					for updated_transistor in resistor_merged.transistors:
-						queue.append(updated_transistor)
-					# iterate through all the dynamic_groups that may have been affected?
-					# which dyn_group would change if only the res_group changed? None
+					for dyn_group in dyn_groups:
+						# a res_group was split. Therefore, a simple find_res
+						res_group = self.find_res(dyn_group)
+						for dyn_group in res_group.dyn_groups:
+							dyn_group.resistor_override = res_group
 
-				merged.resistor_override = resistor_merged
+			elif new_state is TransistorState.open:
+				is_source = False
 
-			elif new_state is TransistorState.closed:
-				# disconnection logic
-				for pos in transistor.groups:
-					print('New disconnected group')
-					group = self.static_groups[pos]
-					dyn_group = self.find_dyn(group)
+				dyn_groups = []
 
-					# FIX: wasted effort if same group connected
+				for group in transistor.groups:
+					dyn_group = group.override
+					dyn_groups.append(dyn_group)
+					if dyn_group.is_source: is_source = False
 
-					for static_group in dyn_group.groups:
-						if static_group.override is not None:
-							static_group.override
+				if is_source:
+					# we could just subtract the dyn group and drop the detached sources
+					# but we can't do that in the case where the dyn_group being a source
+					# splits the res_group. Thus we must just resort to find_res() instead
 
-						static_group.override = dyn_group
+					# no resistor_override for a new one, so we're fine there
+					merged_dyn_group = DynamicWireGroup()
+					for dyn_group in dynamic_groups:
+						merged_dyn_group |= dyn_group
 
-					for updated_transistor in dyn_group.transistor_gates:
-						queue.append(updated_transistor)
+					for static_group in merged_dyn_group:
+						static_group.override = merged_dyn_group
+
+					# for all of the resistors, we need to find_res for all the connected dyn_groups
+					for resistor_pos in dyn_group.resistors:
+						resistor = self.resistors[resistor_pos]
+
+						for group_pos in resistor.groups:
+							group = self.static_groups[group_pos]
+							dyn_group = group.override
+
+							if dyn_group.is_source(): continue
+
+							res_group = self.find_res(dyn_group)
+
+							for dyn_group in res_group.dyn_groups:
+								dyn_group.resistor_override = res_group
+
+				else:
+					# we have all the dyn_groups
+					# merge all the res_groups into this one.
+					# remove the ones we have right now.
+					# get a merged dyn_group.
+					# and add that.
+					# no need to deal with any sources.
+					merged_dyn_group = DynamicWireGroup()
+					res_group = ResistorWireGroup()
+
+					for dyn_group in dyn_groups:
+						merged_dyn_group |= dyn_group
+
+						res_group |= dyn_group.resistor_override
+						res_group.dyn_groups.remove(dyn_group)  # we don't want this because we'll be adding the merged one
+
+					res_group.merge_dynamic(merged_dyn_group)
 
 			else:
 				raise ValueError(f'Invalid transistor state: {new_state!r}')
@@ -762,40 +773,30 @@ class Circuit:
 		return out
 
 	def find_res(self, root_group: DynamicWireGroup) -> ResistorWireGroup:
-		out = ResistorWireGroup()
+		# similar but not the same as find_dyn()
+		
+		# assume root_group.sources is empty
+
+		out = ResistorWireGroup()  # root_group.resistor_override to be set by the caller
 
 		queue = [root_group]
 		while queue:
 			dyn_group = queue.pop(0)
-			if dyn_group in out.dynamic_groups: continue  # already merged
+			if dyn_group in out.dynamic_groups: continue
 
-			if dyn_group.is_source():
-				# don't ripple from a source group
-				out.sources.add(dyn_group)
-				continue
-
-			out.merge_dynamic(dyn_group)
-			# dyn_group.resistor_override = out
-			print('Adding to disconnected resistor group:', dyn_group.cells)
-			print('Resistor group now has resistors at:', out.resistors)
-			print('Dynamic group now has resistors at:', dyn_group.resistors)
-
+			out.merge_dynamic(group)
 			for resistor_pos in dyn_group.resistors:
-				print('Getting groups linked to resistor at', resistor_pos)
-
 				resistor = self.resistors[resistor_pos]
 
-				for ripple_group_pos in transistor.groups:
-					ripple_group = self.static_groups[ripple_group_pos]
-					if ripple_group is not dyn_group:
-						queue.append(ripple_group)
+				for ripple_dyn_group_pos in resistor.groups:
+					ripple_dyn_group = self.static_groups[ripple_dyn_group_pos].get_override()
+
+					if ripple_dyn_group.is_source():
+						out.sources.add(ripple_dyn_group)
+					elif ripple_dyn_group is not dyn_group:
+						queue.append(ripple_dyn_group)
 
 		return out
-
-	def find_resistor_group(self, root_group: DynamicWireGroup) -> ResistorWireGroup:
-		# similar but not the same as find_dyn()
-		...
-
 
 	import io
 	def generate_source(self):
