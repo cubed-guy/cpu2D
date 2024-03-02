@@ -30,6 +30,7 @@ fps = 60
 
 ZOOM_FAC_NUM = 4
 ZOOM_FAC_DEN = 5
+WHEEL_FAC = 7
 
 w, h = res = (1280, 800)
 
@@ -86,12 +87,12 @@ class CopyMode(Enum):
 	select = auto()
 	ready = auto()
 
-view_rect = pygame.Rect(440, 220, w, h)
+view_rect = pygame.Rect(0, 0, w, h)
 dragging = False
 ticks = 0
 
 selected_group = None
-size = 64
+size = 36
 paint_mode = cpu.Cell.conductor
 circuit = cpu.Circuit(500, 500)
 
@@ -162,7 +163,7 @@ circuit.mat[3][16] = cpu.Cell.conductor
 circuit.mat[3][22] = cpu.Cell.conductor
 circuit.mat[4][16] = cpu.Cell.conductor
 circuit.mat[4][22] = cpu.Cell.conductor
-circuit.mat[5][4] = cpu.Cell.ground
+circuit.mat[5][4] = cpu.Cell.live
 circuit.mat[5][5] = cpu.Cell.conductor
 circuit.mat[5][6] = cpu.Cell.conductor
 circuit.mat[5][7] = cpu.Cell.conductor
@@ -272,9 +273,9 @@ circuit.mat[20][16] = cpu.Cell.conductor
 circuit.mat[20][17] = cpu.Cell.conductor
 circuit.mat[20][18] = cpu.Cell.conductor
 
-circuit.generate_groups()
-circuit.update_transistors()
-circuit.update_resistor_groups()
+# circuit.generate_groups()
+# circuit.generate_dyn_groups()
+# circuit.update_transistors()
 
 copy_region = [(0, 0), (0, 0)]
 copy_mode = CopyMode.inactive
@@ -305,22 +306,19 @@ while running:
 					paint_mode = cpu.Cell.ground
 				else:
 					paint_mode = cpu.Cell.live
+
 			elif event.key == K_s: print(end=circuit.generate_source())
-			elif event.key == K_r: circuit.update_resistor_groups()
+
 			elif event.key == K_g:
 				circuit.generate_groups()
-				if not event.mod & (KMOD_LSHIFT|KMOD_RSHIFT):
-					circuit.update_transistors()
-					circuit.update_resistor_groups()
+				circuit.generate_dyn_groups()
+			elif event.key == K_t: circuit.update_transistors()
+
 			elif event.key == K_c:
 				if event.mod & (KMOD_LSHIFT|KMOD_RSHIFT):
 					copy_mode = CopyMode.ready
 				else:
 					copy_mode = CopyMode.active
-			elif event.key == K_t:
-				circuit.update_transistors()
-				if not event.mod & (KMOD_LSHIFT|KMOD_RSHIFT):
-					circuit.update_resistor_groups()
 			elif event.key == K_i:
 				mouse_pos = pygame.mouse.get_pos()
 				x, y = from_screen_space(mouse_pos, view_rect, size)
@@ -344,10 +342,16 @@ while running:
 		elif event.type == VIDEORESIZE:
 			if not display.get_flags()&FULLSCREEN: resize(event.size)
 		elif event.type == QUIT: running = False
+
+		elif event.type == MOUSEWHEEL:
+			view_rect[0] += event.x * WHEEL_FAC
+			view_rect[1] -= event.y * WHEEL_FAC
+
 		elif event.type == MOUSEBUTTONDOWN:
 
 			if event.button in (4, 5):
-				if pygame.key.get_mods() & (KMOD_LCTRL|KMOD_RCTRL):
+				mods = pygame.key.get_mods()
+				if mods & (KMOD_LCTRL|KMOD_RCTRL):
 					old_size = size
 
 					if event.button == 5:
@@ -359,10 +363,18 @@ while running:
 						size *= ZOOM_FAC_DEN
 						size //= ZOOM_FAC_NUM
 
+					# top_left of the rect should move proportionally
+					view_rect[0] -= w//2
 					view_rect[0] *= size
 					view_rect[0] //= old_size
-					# top_left of the rect should move proportionally
-				else:
+					view_rect[0] += w//2
+
+					view_rect[1] -= h//2
+					view_rect[1] *= size
+					view_rect[1] //= old_size
+					view_rect[1] += h//2
+
+				elif mods & (KMOD_LSHIFT|KMOD_RSHIFT):
 					delta = event.button*2-9
 					val = paint_mode.value + delta - 1
 					val %= len(cpu.Cell)
@@ -402,11 +414,19 @@ while running:
 						dragging = True
 						if not pygame.key.get_mods()&(KMOD_LSHIFT|KMOD_RSHIFT):
 							x, y = click_pos
-							circuit.mat[y][x] = paint_mode
+							if circuit.mat[y][x] != paint_mode:
+								circuit.mat[y][x] = paint_mode
+								print(f'PAINTED {x, y} to {paint_mode}')
+
 			elif event.button == 3:
 				x, y = from_screen_space(event.pos, view_rect, size)
 				if (x, y) in circuit.static_groups:
-					selected_group = circuit.static_groups[x, y].get_resistor_override()
+					selected_group = circuit.static_groups[x, y]
+					if selected_group.override is not None:
+						selected_group = selected_group.override
+						if selected_group.resistor_override is not None:
+							selected_group = selected_group.resistor_override
+
 		elif event.type == MOUSEBUTTONUP:
 			if event.button == 1:
 				dragging = False
