@@ -5,7 +5,8 @@
 # DONE: Resistors are not insulators
 # DONE: Copy-paste support
 # DONE: Overlap Support
-# TODO: Optimise Resistor Updates
+# DONE: Optimise Resistor Updates
+# TODO: Erase Area
 # TODO: Optimise matrix rendering
 # TODO: Rewind
 
@@ -145,137 +146,126 @@ circuit = cpu.Circuit(500, 500)
 # circuit.mat[14][11] = cpu.Cell.ground
 # circuit.mat[14][19] = cpu.Cell.live
 
-circuit.mat[2][4] = cpu.Cell.live
-circuit.mat[2][5] = cpu.Cell.conductor
-circuit.mat[2][6] = cpu.Cell.conductor
-circuit.mat[2][7] = cpu.Cell.conductor
-circuit.mat[2][8] = cpu.Cell.conductor
-circuit.mat[2][9] = cpu.Cell.conductor
-circuit.mat[2][10] = cpu.Cell.conductor
-circuit.mat[2][11] = cpu.Cell.conductor
-circuit.mat[2][12] = cpu.Cell.conductor
-circuit.mat[2][13] = cpu.Cell.conductor
-circuit.mat[2][14] = cpu.Cell.conductor
-circuit.mat[2][15] = cpu.Cell.conductor
-circuit.mat[2][16] = cpu.Cell.conductor
-circuit.mat[2][22] = cpu.Cell.conductor
-circuit.mat[3][16] = cpu.Cell.conductor
-circuit.mat[3][22] = cpu.Cell.conductor
-circuit.mat[4][16] = cpu.Cell.conductor
-circuit.mat[4][22] = cpu.Cell.conductor
-circuit.mat[5][4] = cpu.Cell.live
-circuit.mat[5][5] = cpu.Cell.conductor
-circuit.mat[5][6] = cpu.Cell.conductor
-circuit.mat[5][7] = cpu.Cell.conductor
-circuit.mat[5][8] = cpu.Cell.conductor
-circuit.mat[5][9] = cpu.Cell.conductor
-circuit.mat[5][14] = cpu.Cell.conductor
-circuit.mat[5][15] = cpu.Cell.conductor
-circuit.mat[5][16] = cpu.Cell.conductor
-circuit.mat[5][22] = cpu.Cell.conductor
-circuit.mat[6][9] = cpu.Cell.conductor
-circuit.mat[6][14] = cpu.Cell.conductor
-circuit.mat[6][16] = cpu.Cell.transistor_gate
-circuit.mat[6][22] = cpu.Cell.conductor
-circuit.mat[7][9] = cpu.Cell.conductor
-circuit.mat[7][11] = cpu.Cell.ground
+circuit.mat[6][7] = cpu.Cell.live
+circuit.mat[6][11] = cpu.Cell.ground
+circuit.mat[6][17] = cpu.Cell.ground
+circuit.mat[7][7] = cpu.Cell.conductor
+circuit.mat[7][11] = cpu.Cell.conductor
 circuit.mat[7][12] = cpu.Cell.conductor
 circuit.mat[7][13] = cpu.Cell.conductor
-circuit.mat[7][14] = cpu.Cell.overlap
-circuit.mat[7][15] = cpu.Cell.conductor
+circuit.mat[7][14] = cpu.Cell.conductor
+circuit.mat[7][15] = cpu.Cell.transistor_gate
 circuit.mat[7][16] = cpu.Cell.transistor
-circuit.mat[7][22] = cpu.Cell.conductor
-circuit.mat[8][9] = cpu.Cell.conductor
-circuit.mat[8][14] = cpu.Cell.conductor
+circuit.mat[7][17] = cpu.Cell.conductor
+circuit.mat[8][7] = cpu.Cell.conductor
+circuit.mat[8][11] = cpu.Cell.conductor
 circuit.mat[8][16] = cpu.Cell.conductor
-circuit.mat[8][17] = cpu.Cell.resistor
-circuit.mat[8][18] = cpu.Cell.conductor
-circuit.mat[8][19] = cpu.Cell.live
-circuit.mat[8][22] = cpu.Cell.conductor
-circuit.mat[9][9] = cpu.Cell.conductor
-circuit.mat[9][14] = cpu.Cell.conductor
+circuit.mat[9][7] = cpu.Cell.conductor
+circuit.mat[9][9] = cpu.Cell.ground
+circuit.mat[9][11] = cpu.Cell.conductor
+circuit.mat[9][13] = cpu.Cell.conductor
+circuit.mat[9][14] = cpu.Cell.live
 circuit.mat[9][16] = cpu.Cell.conductor
-circuit.mat[9][22] = cpu.Cell.conductor
+circuit.mat[10][7] = cpu.Cell.conductor
 circuit.mat[10][9] = cpu.Cell.conductor
-circuit.mat[10][14] = cpu.Cell.conductor
+circuit.mat[10][11] = cpu.Cell.conductor
+circuit.mat[10][13] = cpu.Cell.resistor
 circuit.mat[10][16] = cpu.Cell.conductor
-circuit.mat[10][22] = cpu.Cell.conductor
-circuit.mat[11][9] = cpu.Cell.conductor
+circuit.mat[11][7] = cpu.Cell.conductor
+circuit.mat[11][8] = cpu.Cell.transistor_gate
+circuit.mat[11][9] = cpu.Cell.transistor
+circuit.mat[11][10] = cpu.Cell.conductor
+circuit.mat[11][11] = cpu.Cell.overlap
+circuit.mat[11][12] = cpu.Cell.conductor
+circuit.mat[11][13] = cpu.Cell.conductor
 circuit.mat[11][14] = cpu.Cell.conductor
-circuit.mat[11][16] = cpu.Cell.conductor
-circuit.mat[11][22] = cpu.Cell.conductor
-circuit.mat[12][9] = cpu.Cell.conductor
-circuit.mat[12][14] = cpu.Cell.conductor
-circuit.mat[12][16] = cpu.Cell.conductor
-circuit.mat[12][22] = cpu.Cell.conductor
+circuit.mat[11][15] = cpu.Cell.transistor
+circuit.mat[11][16] = cpu.Cell.transistor_gate
+circuit.mat[11][17] = cpu.Cell.resistor
+circuit.mat[12][7] = cpu.Cell.conductor
+circuit.mat[12][11] = cpu.Cell.transistor_gate
+circuit.mat[12][15] = cpu.Cell.conductor
+circuit.mat[12][17] = cpu.Cell.conductor
 circuit.mat[13][7] = cpu.Cell.conductor
 circuit.mat[13][8] = cpu.Cell.conductor
 circuit.mat[13][9] = cpu.Cell.conductor
+circuit.mat[13][10] = cpu.Cell.conductor
+circuit.mat[13][11] = cpu.Cell.transistor
+circuit.mat[13][12] = cpu.Cell.conductor
+circuit.mat[13][13] = cpu.Cell.conductor
 circuit.mat[13][14] = cpu.Cell.conductor
-circuit.mat[13][16] = cpu.Cell.conductor
-circuit.mat[13][22] = cpu.Cell.conductor
-circuit.mat[14][7] = cpu.Cell.conductor
-circuit.mat[14][9] = cpu.Cell.transistor_gate
-circuit.mat[14][14] = cpu.Cell.conductor
-circuit.mat[14][16] = cpu.Cell.conductor
-circuit.mat[14][22] = cpu.Cell.conductor
-circuit.mat[15][4] = cpu.Cell.ground
-circuit.mat[15][5] = cpu.Cell.conductor
-circuit.mat[15][6] = cpu.Cell.conductor
-circuit.mat[15][7] = cpu.Cell.overlap
-circuit.mat[15][8] = cpu.Cell.conductor
-circuit.mat[15][9] = cpu.Cell.transistor
-circuit.mat[15][14] = cpu.Cell.conductor
-circuit.mat[15][16] = cpu.Cell.conductor
-circuit.mat[15][22] = cpu.Cell.conductor
-circuit.mat[16][7] = cpu.Cell.conductor
-circuit.mat[16][9] = cpu.Cell.conductor
-circuit.mat[16][10] = cpu.Cell.resistor
-circuit.mat[16][11] = cpu.Cell.conductor
-circuit.mat[16][12] = cpu.Cell.live
-circuit.mat[16][14] = cpu.Cell.conductor
-circuit.mat[16][16] = cpu.Cell.conductor
-circuit.mat[16][22] = cpu.Cell.conductor
-circuit.mat[17][7] = cpu.Cell.conductor
-circuit.mat[17][9] = cpu.Cell.conductor
-circuit.mat[17][14] = cpu.Cell.conductor
-circuit.mat[17][16] = cpu.Cell.transistor_gate
-circuit.mat[17][22] = cpu.Cell.conductor
-circuit.mat[18][7] = cpu.Cell.conductor
-circuit.mat[18][9] = cpu.Cell.conductor
-circuit.mat[18][10] = cpu.Cell.conductor
-circuit.mat[18][11] = cpu.Cell.conductor
-circuit.mat[18][12] = cpu.Cell.conductor
-circuit.mat[18][13] = cpu.Cell.conductor
-circuit.mat[18][14] = cpu.Cell.overlap
-circuit.mat[18][15] = cpu.Cell.conductor
-circuit.mat[18][16] = cpu.Cell.transistor
-circuit.mat[18][17] = cpu.Cell.conductor
-circuit.mat[18][18] = cpu.Cell.conductor
-circuit.mat[18][22] = cpu.Cell.conductor
-circuit.mat[19][7] = cpu.Cell.conductor
-circuit.mat[19][14] = cpu.Cell.transistor_gate
-circuit.mat[19][18] = cpu.Cell.conductor
-circuit.mat[19][19] = cpu.Cell.conductor
-circuit.mat[19][20] = cpu.Cell.conductor
-circuit.mat[19][21] = cpu.Cell.conductor
-circuit.mat[19][22] = cpu.Cell.conductor
-circuit.mat[20][7] = cpu.Cell.conductor
-circuit.mat[20][8] = cpu.Cell.conductor
-circuit.mat[20][9] = cpu.Cell.conductor
-circuit.mat[20][10] = cpu.Cell.conductor
-circuit.mat[20][11] = cpu.Cell.conductor
-circuit.mat[20][12] = cpu.Cell.conductor
-circuit.mat[20][13] = cpu.Cell.conductor
-circuit.mat[20][14] = cpu.Cell.transistor
-circuit.mat[20][15] = cpu.Cell.conductor
-circuit.mat[20][16] = cpu.Cell.conductor
-circuit.mat[20][17] = cpu.Cell.conductor
-circuit.mat[20][18] = cpu.Cell.conductor
-
-# circuit.generate_groups()
-# circuit.generate_dyn_groups()
-# circuit.update_transistors()
+circuit.mat[13][15] = cpu.Cell.conductor
+circuit.mat[13][17] = cpu.Cell.live
+circuit.mat[14][15] = cpu.Cell.conductor
+circuit.mat[15][15] = cpu.Cell.conductor
+circuit.mat[27][7] = cpu.Cell.conductor
+circuit.mat[27][8] = cpu.Cell.conductor
+circuit.mat[27][9] = cpu.Cell.conductor
+circuit.mat[27][14] = cpu.Cell.conductor
+circuit.mat[27][16] = cpu.Cell.conductor
+circuit.mat[27][22] = cpu.Cell.conductor
+circuit.mat[28][7] = cpu.Cell.conductor
+circuit.mat[28][9] = cpu.Cell.transistor_gate
+circuit.mat[28][14] = cpu.Cell.conductor
+circuit.mat[28][16] = cpu.Cell.conductor
+circuit.mat[28][22] = cpu.Cell.conductor
+circuit.mat[29][4] = cpu.Cell.ground
+circuit.mat[29][5] = cpu.Cell.conductor
+circuit.mat[29][6] = cpu.Cell.conductor
+circuit.mat[29][7] = cpu.Cell.overlap
+circuit.mat[29][8] = cpu.Cell.conductor
+circuit.mat[29][9] = cpu.Cell.transistor
+circuit.mat[29][14] = cpu.Cell.conductor
+circuit.mat[29][16] = cpu.Cell.conductor
+circuit.mat[29][22] = cpu.Cell.conductor
+circuit.mat[30][7] = cpu.Cell.conductor
+circuit.mat[30][9] = cpu.Cell.conductor
+circuit.mat[30][10] = cpu.Cell.resistor
+circuit.mat[30][11] = cpu.Cell.conductor
+circuit.mat[30][12] = cpu.Cell.live
+circuit.mat[30][14] = cpu.Cell.conductor
+circuit.mat[30][16] = cpu.Cell.conductor
+circuit.mat[30][22] = cpu.Cell.conductor
+circuit.mat[31][7] = cpu.Cell.conductor
+circuit.mat[31][9] = cpu.Cell.conductor
+circuit.mat[31][14] = cpu.Cell.conductor
+circuit.mat[31][16] = cpu.Cell.transistor_gate
+circuit.mat[31][22] = cpu.Cell.conductor
+circuit.mat[32][7] = cpu.Cell.conductor
+circuit.mat[32][9] = cpu.Cell.conductor
+circuit.mat[32][10] = cpu.Cell.conductor
+circuit.mat[32][11] = cpu.Cell.conductor
+circuit.mat[32][12] = cpu.Cell.conductor
+circuit.mat[32][13] = cpu.Cell.conductor
+circuit.mat[32][14] = cpu.Cell.overlap
+circuit.mat[32][15] = cpu.Cell.conductor
+circuit.mat[32][16] = cpu.Cell.transistor
+circuit.mat[32][17] = cpu.Cell.conductor
+circuit.mat[32][18] = cpu.Cell.conductor
+circuit.mat[32][22] = cpu.Cell.conductor
+circuit.mat[33][7] = cpu.Cell.conductor
+circuit.mat[33][14] = cpu.Cell.transistor_gate
+circuit.mat[33][18] = cpu.Cell.conductor
+circuit.mat[33][19] = cpu.Cell.conductor
+circuit.mat[33][20] = cpu.Cell.conductor
+circuit.mat[33][21] = cpu.Cell.conductor
+circuit.mat[33][22] = cpu.Cell.conductor
+circuit.mat[34][7] = cpu.Cell.conductor
+circuit.mat[34][8] = cpu.Cell.conductor
+circuit.mat[34][9] = cpu.Cell.conductor
+circuit.mat[34][10] = cpu.Cell.conductor
+circuit.mat[34][11] = cpu.Cell.conductor
+circuit.mat[34][12] = cpu.Cell.conductor
+circuit.mat[34][13] = cpu.Cell.conductor
+circuit.mat[34][14] = cpu.Cell.transistor
+circuit.mat[34][15] = cpu.Cell.conductor
+circuit.mat[34][16] = cpu.Cell.conductor
+circuit.mat[34][17] = cpu.Cell.conductor
+circuit.mat[34][18] = cpu.Cell.conductor
+circuit.generate_groups()
+circuit.generate_dyn_groups()
+circuit.generate_res_groups()
+circuit.update_transistors()
 
 copy_region = [(0, 0), (0, 0)]
 copy_mode = CopyMode.inactive
@@ -312,6 +302,7 @@ while running:
 			elif event.key == K_g:
 				circuit.generate_groups()
 				circuit.generate_dyn_groups()
+				circuit.generate_res_groups()
 			elif event.key == K_t: circuit.update_transistors()
 
 			elif event.key == K_c:
