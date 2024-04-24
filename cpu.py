@@ -242,7 +242,7 @@ class ResistorWireGroup:
 		Merges all sets EXCEPT SOURCES
 		'''
 
-		print(f'Merging {self!r} with the dynamic group:', dyn_group)
+		# print(f'Merging {self!r} with the dynamic group:', dyn_group)
 
 		self.dynamic_groups.add(dyn_group)
 		self.transistors |= dyn_group.transistors
@@ -638,7 +638,7 @@ class Circuit:
 
 			if transistor.state is new_state: continue
 
-			print('Updating transistor at', transistor_pos)  # this might be very useful
+			# print('Updating transistor at', transistor_pos)  # this might be very useful
 
 			transistor.state = new_state
 			dormants.add(transistor_pos)
@@ -665,7 +665,7 @@ class Circuit:
 					else:
 						dyn_groups.append(dyn_group)
 
-				print('close transitor was connected to', group)
+				# print('close transitor was connected to', group)
 
 				if was_source:
 					for dyn_group in dyn_groups:
@@ -704,7 +704,7 @@ class Circuit:
 
 						for dyn_group in merged_res_group.dynamic_groups:
 							dyn_group.resistor_override = merged_res_group
-							print(f'{merged_res_group!r} is set as override of', dyn_group)
+							# print(f'{merged_res_group!r} is set as override of', dyn_group)
 
 				else:
 					for dyn_group in dyn_groups:
@@ -720,7 +720,7 @@ class Circuit:
 
 				for group_pos in transistor.groups:
 					group = self.static_groups[group_pos]
-					print('open transistor is connected to:', group)
+					# print('open transistor is connected to:', group)
 					dyn_group = group.override
 					dyn_groups.append(dyn_group)
 					if dyn_group.is_source(): is_source = True
@@ -751,11 +751,11 @@ class Circuit:
 
 							res_group = self.find_res(dyn_group)
 
-							for dyn_group in res_group.dyn_groups:
+							for dyn_group in res_group.dynamic_groups:
 								dyn_group.resistor_override = res_group
 
 				else:
-					print('Group merging into a res_group')
+					# print('Group merging into a res_group')
 					# we have all the dyn_groups
 					# merge all the res_groups into this one.
 					# remove the ones we have right now.
@@ -781,7 +781,7 @@ class Circuit:
 		# self.update_resistor_groups()
 
 	def find_dyn(self, root_group: WireGroup):
-		print('Finding dyn from:', root_group)
+		# print('Finding dyn from:', root_group)
 		out = DynamicWireGroup()
 
 		queue = [root_group]
@@ -791,9 +791,9 @@ class Circuit:
 
 			out.merge_static(group)
 			# group.override = out
-			print('Adding to disconnected dynamic group:', group.cells)
-			print('Dynamic group now has transistors at:', out.transistors)
-			print('Static group now has transistors at:', group.transistors)
+			# print('Adding to disconnected dynamic group:', group.cells)
+			# print('Dynamic group now has transistors at:', out.transistors)
+			# print('Static group now has transistors at:', group.transistors)
 
 			for transistor_pos in group.transistors:
 				transistor = self.transistors[transistor_pos]
@@ -810,7 +810,7 @@ class Circuit:
 		return out
 
 	def find_res(self, root_group: DynamicWireGroup) -> ResistorWireGroup:
-		print('Finding res from:', root_group)
+		# print('Finding res from:', root_group)
 		# similar but not the same as find_dyn()
 		
 		# assume root_group.sources is empty
